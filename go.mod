@@ -1,4 +1,4 @@
-module github.com/postfinance/kubelet-csr-approver
+module github.com/deas/csr-approver
 
 go 1.22.0
 

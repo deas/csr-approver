@@ -18,22 +18,21 @@ package controller_test
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
+	"log"
 	"net"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"crypto/ed25519"
-	"crypto/rand"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"log"
-
+	"github.com/deas/csr-approver/internal/cmd"
+	"github.com/deas/csr-approver/internal/controller"
 	mockdns "github.com/foxcpp/go-mockdns"
-	"github.com/postfinance/kubelet-csr-approver/internal/cmd"
-	"github.com/postfinance/kubelet-csr-approver/internal/controller"
 
 	"github.com/thanhpk/randstr"
 	capiv1 "k8s.io/api/certificates/v1"
@@ -46,15 +45,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
-var testEnv *envtest.Environment
-var cfg *rest.Config
-var k8sClient client.Client
-var adminClientset *clientset.Clientset
-var dnsResolver mockdns.Resolver
-var csrController *controller.CertificateSigningRequestReconciler
+var (
+	testEnv        *envtest.Environment
+	cfg            *rest.Config
+	k8sClient      client.Client
+	adminClientset *clientset.Clientset
+	dnsResolver    mockdns.Resolver
+	csrController  *controller.CertificateSigningRequestReconciler
+)
 
-var testContext context.Context
-var testContextCancel context.CancelFunc
+var (
+	testContext       context.Context
+	testContextCancel context.CancelFunc
+)
 
 func waitCsrApprovalStatus(csrName string) (approved, denied bool, reason string, err error) {
 	for i := 0; i < 3; i++ {

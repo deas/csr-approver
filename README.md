@@ -1,12 +1,11 @@
-[![Test and publish](https://github.com/postfinance/kubelet-csr-approver/actions/workflows/publish.yaml/badge.svg)](https://github.com/postfinance/kubelet-csr-approver/actions/workflows/publish.yaml)
-[![Coverage Status](https://coveralls.io/repos/github/postfinance/kubelet-csr-approver/badge.svg)](https://coveralls.io/github/postfinance/kubelet-csr-approver)
+[![Test and publish](https://github.com/deas/csr-approver/actions/workflows/publish.yaml/badge.svg)](https://github.com/deas/csr-approver/actions/workflows/publish.yaml)
+[![Coverage Status](https://coveralls.io/repos/github/deas/csr-approver/badge.svg)](https://coveralls.io/github/deas/csr-approver)
 
-# kubelet-csr-approver
+# CSR Approver
 
-Kubelet CSR approver is a Kubernetes controller whose sole purpose is to
-auto-approve [`kubelet-serving` Certificate Signing Request
-(CSR)](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-certs/#kubelet-serving-certs),
-provided these CSRs comply with a series of configurable, provider-specific,
+CSR approver is a Kubernetes controller whose sole purpose is to
+auto-approve `CertificateSigningRequest`s
+(CSRs). It is based on [`postfinance/kubelet-csr-approver`](https://github.com/postfinance/kubelet-csr-approver). It aims at keeping support for [kubelet serving certs](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-certs/#kubelet-serving-certs) while adding support for others, such as those used by [Open Cluster Management](open-cluster-management.io). It ensures, that auto-proved CSRs comply with a series of configurable, provider-specific,
 checks/verifications.
 
 Inspired by existing projects (such as
@@ -14,16 +13,14 @@ Inspired by existing projects (such as
 implements additional verifications to prevent an attacker from forging
 Certificates.
 
-Kubelet CSR approver is being kept up-to-date in accordance with the [most recent three Kubernetes minor releases](https://kubernetes.io/releases/).
-
 ## Quick start
 
-1. deploy `kubelet-csr-approver` on your k8s cluster using the manifests
+1. deploy `csr-approver` on your k8s cluster using the manifests
    present in [`deploy/k8s`](deploy/k8s)
 2. change the `/var/lib/kubelet/config.yaml` file and restart your kubelet once
    having included the following field: `yaml serverTLSBootstrap: true`
 3. at that point, there should be a number of CSRs on your cluster, that the
-   `kubelet-csr-approver` will approve (or deny) depending on the deployment
+   `csr-approver` will approve (or deny) depending on the deployment
    parameters you have set.
 
 ### Parameters
@@ -61,9 +58,10 @@ it permits having a DNS name that differs (i.e. isn't prefixed) by the hostname
   DNS name in the certificate request. the default value is set to 1.
 * `--leader-election` or `LEADER_ELECTION` permits enabling leader election
   when running with multiple replicas
+* `--bypass-ns-sa` or `BYPASS_NS_SA` permits bypassing the checks for CSR created by service accounts in a specific namespace (Introduced for Open Cluster Management)
 
 It is important to understand that the node DNS name needs to be
-resolvable for the `kubelet-csr-approver` to work properly. If this is an issue
+resolvable for the `csr-approver` to work properly. If this is an issue
 for you, you can use the `--bypass-dns-resolution` flag, which will disable the DNS
 check altogether.
 
@@ -75,8 +73,7 @@ mechanisms are put in place.
 Adjust `providerRegex`, `providerIpPrefixes` and `maxExpirationSeconds` as needed.
 
 ```bash
-helm repo add kubelet-csr-approver https://postfinance.github.io/kubelet-csr-approver
-helm install kubelet-csr-approver kubelet-csr-approver/kubelet-csr-approver -n kube-system \
+helm install csr-approver ./charts/csr-approver -n kube-system \
   --set providerRegex='^node-\w*\.int\.company\.ch$' \
   --set providerIpPrefixes='192.168.8.0/22' \
   --set maxExpirationSeconds='86400'
@@ -139,7 +136,7 @@ get a forged hostname to be signed, it would indeed require:
   name is prefixed by the node name) \ it might then be possible to create a
   CSR from a node `a` (not a smart name for a node, I agree), or a node `auth`,
   already more plausible
-* to modify the provider-specific regex of the `kubelet-csr-approver` (requires
+* to modify the provider-specific regex of the `csr-approver` (requires
   API access or direct access to the node where the controller is running). \
   however with API access, the attacker could as well also directly approve the
   CSR, and with full node access, the attacker could retrieve the controller's
@@ -164,5 +161,7 @@ When building locally to run the CSR approver on an actual cluster with e.g. the
 authentication providers. You will then build as follows:
 
 ```bash
-go build -tags debug ./cmd/kubelet-csr-approver/
+make
 ```
+
+Should give you a bunch of tasks/targets to start with.

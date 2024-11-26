@@ -1,6 +1,6 @@
-# kubelet-csr-approver
+# csr-approver
 
-Kubelet CSR approver is a Kubernetes controller whose sole purpose is to
+CSR approver is a Kubernetes controller whose sole purpose is to
 auto-approve [`kubelet-serving` Certificate Signing Request
 (CSR)](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-certs/#kubelet-serving-certs),
 provided these CSRs comply with a series of configurable, provider-specific,
@@ -14,8 +14,8 @@ recent three Kubernetes minor releases](https://kubernetes.io/releases/).
 Adjust `providerRegex`, `providerIpPrefixes` and `maxExpirationSeconds` as needed.
 
 ```bash
-helm repo add kubelet-csr-approver https://postfinance.github.io/kubelet-csr-approver
-helm install kubelet-csr-approver kubelet-csr-approver/kubelet-csr-approver -n kube-system \
+helm repo add csr-approver https://postfinance.github.io/csr-approver
+helm install csr-approver csr-approver/csr-approver -n kube-system \
   --set providerRegex='^node-\w*\.int\.company\.ch$' \
   --set providerIpPrefixes='192.168.8.0/22' \
   --set maxExpirationSeconds='86400'
@@ -59,10 +59,10 @@ it permits having a DNS name that differs (i.e. isn't prefixed) by the hostname
   when running with multiple replicas
 
 It is important to understand that the node DNS name needs to be
-resolvable for the `kubelet-csr-approver` to work properly. If this is an issue
+resolvable for the `csr-approver` to work properly. If this is an issue
 for you, please file an issue and I'll add a flag to disable this validation.
 
 ℹ have a look below in this README to understand which other validation
 mechanisms are put in place.
 
-More information can be found on the [projet's homepage](https://github.com/postfinance/kubelet-csr-approver)
+More information can be found on the [projet's homepage](https://github.com/deas/csr-approver)

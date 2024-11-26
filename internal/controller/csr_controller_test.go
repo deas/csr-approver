@@ -66,6 +66,30 @@ func TestWrongSignerCsr(t *testing.T) {
 	assert.False(t, approved)
 }
 
+func TestByPassNSSACsr(t *testing.T) {
+	csrParams := CsrParams{
+		csrName:     "csr-bypass-nssa",
+		ipAddresses: testNodeIpAddresses,
+		nodeName:    testNodeName,
+		username:    "system:serviceaccount:open-cluster-management:foo",
+		dnsName:     testNodeName + ".test.ch",
+	}
+	csrController.BypassNSSA = "system:serviceaccount:open-cluster-management:"
+
+	csr := createCsr(t, csrParams)
+	csr.Spec.SignerName = "example.com/not-kubelet-serving"
+
+	_, nodeClientSet, _ := createControlPlaneUser(t, csr.Spec.Username, []string{"system:masters"})
+	_, err := nodeClientSet.CertificatesV1().CertificateSigningRequests().Create(testContext, &csr, metav1.CreateOptions{})
+	require.Nil(t, err, "Could not create the CSR.")
+
+	approved, denied, reason, err := waitCsrApprovalStatus(csr.Name)
+	t.Log(reason)
+	require.Nil(t, err, "Could not retrieve the CSR to check its approval status")
+	assert.False(t, denied)
+	assert.True(t, approved)
+}
+
 func TestNonMatchingCommonNameUsername(t *testing.T) {
 	csrParams := CsrParams{
 		csrName:     "csr-non-matching",
@@ -109,6 +133,7 @@ func TestRegexCheckActiveWithBypass(t *testing.T) {
 	assert.False(t, approved)
 	assert.True(t, denied)
 }
+
 func TestInvalidDNSName(t *testing.T) {
 	csrParams := CsrParams{
 		csrName:  "csr-invalid-dnsName",
@@ -152,6 +177,7 @@ func TestInvalidRegexName(t *testing.T) {
 	assert.True(t, denied)
 	assert.False(t, approved)
 }
+
 func TestUnresolvedDNSName(t *testing.T) {
 	csrParams := CsrParams{
 		csrName:  "csr-unresolved-dnsName",
@@ -189,7 +215,6 @@ func TestMismatchedResolvedIpsSANIps(t *testing.T) {
 	require.Nil(t, err, "Could not retrieve the CSR to check its approval status")
 	assert.True(t, denied)
 	assert.False(t, approved)
-
 }
 
 func TestExpirationSecondsTooLarge(t *testing.T) {

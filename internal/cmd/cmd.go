@@ -5,11 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"regexp"
 	"strings"
-
-	"net/netip"
 
 	"go4.org/netipx"
 
@@ -20,8 +19,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	"github.com/deas/csr-approver/internal/controller"
 	"github.com/go-logr/logr"
-	"github.com/postfinance/kubelet-csr-approver/internal/controller"
 	ctrlconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
@@ -58,7 +57,7 @@ func CreateControllerManager(config *controller.Config, logger logr.Logger) (
 	mgr ctrl.Manager,
 	code int,
 ) {
-	logger.V(0).Info("Kubelet-CSR-Approver controller starting.", "commit", commit, "ref", ref)
+	logger.V(0).Info("CSR-Approver controller starting.", "commit", commit, "ref", ref)
 
 	if config.K8sConfig == nil { // when testing, this variable is already set
 		config.K8sConfig = ctrl.GetConfigOrDie()
@@ -91,7 +90,6 @@ func CreateControllerManager(config *controller.Config, logger logr.Logger) (
 
 	var err error
 	csrController.ProviderIPSet, err = setBuilder.IPSet()
-
 	if err != nil {
 		logger.V(-5).Info("Unable to build the Set of valid IP addresses, exiting")
 
@@ -104,7 +102,7 @@ func CreateControllerManager(config *controller.Config, logger logr.Logger) (
 		Metrics:                server.Options{BindAddress: config.MetricsAddr},
 		HealthProbeBindAddress: config.ProbeAddr,
 		LeaderElection:         config.LeaderElection,
-		LeaderElectionID:       "kubelet-csr-approver",
+		LeaderElectionID:       "csr-approver",
 	}
 
 	// we need to test whether we are running in-cluster or not. if we are not, we will
@@ -119,7 +117,6 @@ func CreateControllerManager(config *controller.Config, logger logr.Logger) (
 	}
 
 	mgr, err = ctrl.NewManager(config.K8sConfig, mgrOptions)
-
 	if err != nil {
 		logger.Error(err, "unable to start manager")
 
@@ -146,7 +143,7 @@ func CreateControllerManager(config *controller.Config, logger logr.Logger) (
 }
 
 func prepareCmdlineConfig() *controller.Config {
-	fs := flag.NewFlagSet("kubelet-csr-approver", flag.ExitOnError)
+	fs := flag.NewFlagSet("csr-approver", flag.ExitOnError)
 	ctrlconfig.RegisterFlags(fs)
 
 	var (
@@ -156,6 +153,7 @@ func prepareCmdlineConfig() *controller.Config {
 		leaderElection         = fs.Bool("leader-election", false, "set this parameter to true to enable leader election")
 		regexStr               = fs.String("provider-regex", ".*", "provider-specified regex to validate CSR SAN names against. accepts everything unless specified")
 		maxSec                 = fs.Int("max-expiration-sec", 367*24*3600, "maximum seconds a CSR can request a cerficate for. defaults to 367 days")
+		bypassNSSA             = fs.String("bypass-ns-sa", "", "namespace with service account user bypass")
 		bypassDNSResolution    = fs.Bool("bypass-dns-resolution", false, "set this parameter to true to bypass DNS resolution checks")
 		bypassHostnameCheck    = fs.Bool("bypass-hostname-check", false, "set this parameter to true to ignore mismatching DNS name and hostname")
 		ignoreNonSystemNodeCsr = fs.Bool("ignore-non-system-node", false, "set this parameter to true to ignore CSR for subjects different than system:node")
@@ -192,6 +190,7 @@ func prepareCmdlineConfig() *controller.Config {
 		RegexStr:               *regexStr,
 		IPPrefixesStr:          *ipPrefixesStr,
 		BypassDNSResolution:    *bypassDNSResolution,
+		BypassNSSA:             *bypassNSSA,
 		BypassHostnameCheck:    *bypassHostnameCheck,
 		IgnoreNonSystemNodeCsr: *ignoreNonSystemNodeCsr,
 		MaxExpirationSeconds:   int32(*maxSec),

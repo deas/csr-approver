@@ -14,7 +14,7 @@ bypassHostnameCheck: false
 providerIpPrefixes: []
 #   - 192.168.8.0/22
 #   - fc00::/7
-
+bypassNSSA: ""
 # logging level ranges from -5 (Fatal) to 10 (Verbose). default level is 0
 loggingLevel: 0
 
@@ -24,7 +24,7 @@ replicas: 2
 namespace: ""
 
 image:
-  repository: ghcr.io/postfinance/kubelet-csr-approver
+  repository: ghcr.io/deas/csr-approver
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
@@ -62,7 +62,8 @@ podLabels: {}
 # PriorityClass indicates the importance of a Pod relative to other Pods.
 priorityClassName: ""
 
-podSecurityContext: {}
+podSecurityContext:
+  {}
   # fsGroup: 65532
 
 securityContext:

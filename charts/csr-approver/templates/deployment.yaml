@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kubelet-csr-approver.fullname" . }}
-  namespace: {{ include "kubelet-csr-approver.namespace" . }}
+  name: {{ include "csr-approver.fullname" . }}
+  namespace: {{ include "csr-approver.namespace" . }}
   labels:
-    {{- include "kubelet-csr-approver.labels" . | nindent 4 }}
+    {{- include "csr-approver.labels" . | nindent 4 }}
 spec:
 {{- if and (gt .Values.replicas 1.0) (not .Values.leaderElection) }}
 {{- fail "leaderElection needs to be enabled in order to use more than 1 replica" }}
@@ -12,7 +12,7 @@ spec:
   replicas: {{ .Values.replicas }}
   selector:
     matchLabels:
-      {{- include "kubelet-csr-approver.selectorLabels" . | nindent 6 }}
+      {{- include "csr-approver.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -20,7 +20,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "kubelet-csr-approver.selectorLabels" . | nindent 8 }}
+        {{- include "csr-approver.selectorLabels" . | nindent 8 }}
         {{- with .Values.podLabels }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -36,7 +36,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "kubelet-csr-approver.serviceAccountName" . }}
+      serviceAccountName: {{ include "csr-approver.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -46,6 +46,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
+            - ./csr-approver
             - -metrics-bind-address
             - ":{{ .Values.metrics.port }}"
             - -health-probe-bind-address
@@ -85,6 +86,10 @@ spec:
           {{- if .Values.bypassHostnameCheck}}
             - name: BYPASS_HOSTNAME_CHECK
               value: {{ .Values.bypassHostnameCheck | quote }}
+          {{- end }}
+          {{- if .Values.bypassNSSA}}
+            - name: BYPASS_NS_SA
+              value: {{ .Values.bypassNSSA| quote }}
           {{- end }}
           {{- with .Values.env }}
             {{ toYaml . | nindent 12 }}

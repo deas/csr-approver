@@ -3,7 +3,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "kubelet-csr-approver.fullname" . }}
+  name: {{ include "csr-approver.fullname" . }}
 rules:
 {{- if .Values.leaderElection }}
 - apiGroups:
@@ -39,6 +39,7 @@ rules:
   - certificates.k8s.io
   resourceNames:
   - kubernetes.io/kubelet-serving
+  - kubernetes.io/kube-apiserver-client
   resources:
   - signers
   verbs:

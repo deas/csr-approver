@@ -1,8 +1,8 @@
 name: Publish
 
 on:
-- push
-- workflow_dispatch
+  - push
+  - workflow_dispatch
 
 jobs:
   check-dockerhub-token:
@@ -84,7 +84,7 @@ jobs:
         run: |
           export REF=${{ github.ref}}
           export COMMIT=${{ github.sha}}
-          ko publish ./cmd/kubelet-csr-approver/ --base-import-paths --platform=linux/amd64 --local
+          ko publish ./cmd/csr-approver/ --base-import-paths --platform=linux/amd64 --local
       - name: Run chart-testing (lint)
         run: ct lint --target-branch=main --check-version-increment=false --chart-dirs=charts
       - name: Create kind cluster
@@ -92,18 +92,18 @@ jobs:
         with:
           cluster_name: kind
       - name: Load image
-        run: kind load docker-image ko.local/kubelet-csr-approver:latest
+        run: kind load docker-image ko.local/csr-approver:latest
       - name: Update chart values
         run: |
           sed -i \
-            -e 's|repository:.*|repository: ko.local/kubelet-csr-approver|g' \
+            -e 's|repository:.*|repository: ko.local/csr-approver|g' \
             -e 's|tag:.*|tag: latest|g' \
             -e 's|providerRegex:.*|providerRegex: ^.+$|g' \
             -e 's|maxExpirationSeconds:.*|maxExpirationSeconds: "86400"|g' \
             -e 's|bypassDnsResolution:.*|bypassDnsResolution: true|g' \
             -e 's|providerIpPrefixes:.*|providerIpPrefixes: [ '192.168.8.0/22', 'fc00::/7' ]|g' \
-            charts/kubelet-csr-approver/values.yaml
-          cat charts/kubelet-csr-approver/values.yaml
+            charts/csr-approver/values.yaml
+          cat charts/csr-approver/values.yaml
       - name: Run chart-testing (install)
         run: ct install --target-branch=main --chart-dirs=charts
 
@@ -128,29 +128,29 @@ jobs:
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
-          username: postfinance
+          username: deas
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Run ko publish for docker.io
         env:
-          KO_DOCKER_REPO: docker.io/postfinance
+          KO_DOCKER_REPO: docker.io/deas
         run: |
           export REF=${{ github.ref}}
           export COMMIT=${{ github.sha}}
           export TAG=$(echo ${{ github.ref }} | cut -d "/" -f 3 - )
-          ko publish ./cmd/kubelet-csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm --tags $TAG
-          ko publish ./cmd/kubelet-csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm
+          ko publish ./cmd/csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm --tags $TAG
+          ko publish ./cmd/csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm
 
       - name: Log in to ghcr.io registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
-      - name: Run ko publish for ghcr.io/postfinance
+      - name: Run ko publish for ghcr.io/deas
         env:
-          KO_DOCKER_REPO: ghcr.io/postfinance
+          KO_DOCKER_REPO: ghcr.io/deas
         run: |
           export REF=${{ github.ref}}
           export COMMIT=${{ github.sha}}
           export TAG=$(echo ${{ github.ref }} | cut -d "/" -f 3 - )
-          ko publish ./cmd/kubelet-csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm --tags $TAG
-          ko publish ./cmd/kubelet-csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm
+          ko publish ./cmd/csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm --tags $TAG
+          ko publish ./cmd/csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm
 
   publish-helm-charts:
     needs:
@@ -210,25 +210,25 @@ jobs:
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
-          username: postfinance
+          username: deas
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Run ko publish for docker.io
         env:
-          KO_DOCKER_REPO: docker.io/postfinance
+          KO_DOCKER_REPO: docker.io/deas
         run: |
           export REF=${{ github.ref}}
           export COMMIT=${{ github.sha}}
-          ko publish ./cmd/kubelet-csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm -t dev
+          ko publish ./cmd/csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm -t dev
 
       - name: Log in to ghcr.io registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
-      - name: Run ko publish for ghcr.io/postfinance
+      - name: Run ko publish for ghcr.io/deas
         env:
-          KO_DOCKER_REPO: ghcr.io/postfinance
+          KO_DOCKER_REPO: ghcr.io/deas
         run: |
           export REF=${{ github.ref}}
           export COMMIT=${{ github.sha}}
-          ko publish ./cmd/kubelet-csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm -t dev
+          ko publish ./cmd/csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm -t dev
 
   publish-feature:
     needs:
@@ -249,26 +249,26 @@ jobs:
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
-          username: postfinance
+          username: deas
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - uses: ko-build/setup-ko@v0.7
         name: Setup ko
       - name: Run ko publish for docker.io
         env:
-          KO_DOCKER_REPO: docker.io/postfinance
+          KO_DOCKER_REPO: docker.io/deas
         run: |
           export REF=${{ github.ref}}
           export COMMIT=${{ github.sha}}
           export FEAT=$(echo $REF  | awk -F 'feat/' '{print $2}')
-          ko publish ./cmd/kubelet-csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm -t $FEAT
+          ko publish ./cmd/csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm -t $FEAT
 
       - name: Log in to ghcr.io registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
-      - name: Run ko publish for ghcr.io/postfinance
+      - name: Run ko publish for ghcr.io/deas
         env:
-          KO_DOCKER_REPO: ghcr.io/postfinance
+          KO_DOCKER_REPO: ghcr.io/deas
         run: |
           export REF=${{ github.ref}}
           export COMMIT=${{ github.sha}}
           export FEAT=$(echo $REF  | awk -F 'feat/' '{print $2}')
-          ko publish ./cmd/kubelet-csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm -t $FEAT
+          ko publish ./cmd/csr-approver/ --base-import-paths --platform=linux/amd64,linux/arm64,linux/arm -t $FEAT

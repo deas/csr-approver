@@ -4,7 +4,7 @@ package main
 import (
 	"os"
 
-	"github.com/postfinance/kubelet-csr-approver/internal/cmd"
+	"github.com/deas/csr-approver/internal/cmd"
 )
 
 func main() {

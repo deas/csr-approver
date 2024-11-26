@@ -1,0 +1,14 @@
+apiVersion: v2
+name: csr-approver
+description: CSR Approver
+type: application
+appVersion: v0.0.1-dummy
+version: 0.0.1-dummy
+maintainers:
+  - name: deas
+home: https://github.com/deas/csr-approver
+# icon: https://avatars.githubusercontent.com/u/34368733
+keywords:
+  - csr-approver
+sources:
+  - https://github.com/deas/csr-approver

@@ -62,6 +62,7 @@ type Config struct {
 	IgnoreNonSystemNodeCsr bool
 	AllowedDNSNames        int
 	BypassHostnameCheck    bool
+	BypassNSSA             string
 }
 
 // CertificateSigningRequestReconciler reconciles a CertificateSigningRequest object
@@ -96,12 +97,6 @@ func (r *CertificateSigningRequestReconciler) Reconcile(ctx context.Context, req
 		return res, returnErr
 	}
 
-	// baseline CSR checks - triage to ignore CSR we should process
-	if csr.Spec.SignerName != certificatesv1.KubeletServingSignerName {
-		l.V(4).Info("Ignoring non-kubelet-serving CSR.")
-		return res, returnErr
-	}
-
 	if approved, denied := GetCertApprovalCondition(&csr.Status); approved || denied {
 		l.V(3).Info("The CSR is already approved|denied. Ignoring", "approved", approved, "denied", denied)
 		return res, returnErr
@@ -119,57 +114,68 @@ func (r *CertificateSigningRequestReconciler) Reconcile(ctx context.Context, req
 		return res, returnErr
 	}
 
-	if !strings.HasPrefix(csr.Spec.Username, "system:node:") {
-		if r.IgnoreNonSystemNodeCsr {
-			l.V(0).Info("Ignoring a CSR with username different than system:node:")
-			return res, returnErr
-		}
-
-		reason := "CSR Spec.Username is not prefixed with system:node:"
-		l.V(0).Info(logDenyingCSR + reason)
-
-		appendCondition(&csr, false, reason)
-	} else if len(x509cr.DNSNames)+len(x509cr.IPAddresses) == 0 {
-		reason := "The x509 Cert Request SAN contains neither an IP address nor a DNS name"
-		l.V(0).Info(logDenyingCSR + reason)
-
-		appendCondition(&csr, false, reason)
-	} else if x509cr.Subject.CommonName != csr.Spec.Username {
-		reason := "CSR username does not match the parsed x509 certificate request commonname"
-		l.V(0).Info(logDenyingCSR+reason,
-			"commonName", x509cr.Subject.CommonName, "specUsername", csr.Spec.Username)
-
-		appendCondition(&csr, false, reason)
-	} else if valid, reason, err := r.DNSCheck(ctx, &csr, x509cr); !valid {
-		if err != nil {
-			l.V(0).Error(err, reason)
-			return res, err // returning a non-nil error to make this request be processed again in the reconcile function
-		}
-
-		l.V(0).Info("Denying kubelet-serving CSR. DNS checks failed. Reason:" + reason)
-
-		appendCondition(&csr, false, reason)
-	} else if valid, reason, err := r.WhitelistedIPCheck(&csr, x509cr); !valid {
-		if err != nil {
-			l.V(0).Error(err, reason)
-			return res, err // returning a non-nil error to make this request be processed again in the reconcile function
-		}
-
-		l.V(0).Info("Denying kubelet-serving CSR. IP whitelist check failed. Reason:" + reason)
-		appendCondition(&csr, false, reason)
-	} else if csr.Spec.ExpirationSeconds != nil && *csr.Spec.ExpirationSeconds > r.MaxExpirationSeconds {
-		reason := "CSR spec.expirationSeconds is longer than the maximum allowed expiration second"
-		l.V(0).Info("Denying kubelet-serving CSR. Reason:" + reason)
-
-		appendCondition(&csr, false, reason)
-	} else if valid, reason := ProviderChecks(&csr, x509cr); !valid {
-		l.V(0).Info("CSR request did not pass the provider-specific tests. Reason: " + reason)
-		appendCondition(&csr, false, reason)
-	} else {
+	if r.BypassNSSA != "" && strings.HasPrefix(csr.Spec.Username, r.BypassNSSA) {
+		l.V(3).Info(fmt.Sprintf("Using bypass namespace %q.", r.BypassNSSA))
 		l.V(0).Info("CSR approved")
 		appendCondition(&csr, true, "")
-	}
+	} else {
+		l.V(3).Info("Using kubelet validation.")
+		// baseline CSR checks - triage to ignore CSR we should process
+		if csr.Spec.SignerName != certificatesv1.KubeletServingSignerName {
+			l.V(4).Info("Ignoring non-kubelet-serving CSR.")
+			return res, returnErr
+		}
+		if !strings.HasPrefix(csr.Spec.Username, "system:node:") {
+			if r.IgnoreNonSystemNodeCsr {
+				l.V(0).Info("Ignoring a CSR with username different than system:node:")
+				return res, returnErr
+			}
 
+			reason := "CSR Spec.Username is not prefixed with system:node:"
+			l.V(0).Info(logDenyingCSR + reason)
+
+			appendCondition(&csr, false, reason)
+		} else if len(x509cr.DNSNames)+len(x509cr.IPAddresses) == 0 {
+			reason := "The x509 Cert Request SAN contains neither an IP address nor a DNS name"
+			l.V(0).Info(logDenyingCSR + reason)
+
+			appendCondition(&csr, false, reason)
+		} else if x509cr.Subject.CommonName != csr.Spec.Username {
+			reason := "CSR username does not match the parsed x509 certificate request commonname"
+			l.V(0).Info(logDenyingCSR+reason,
+				"commonName", x509cr.Subject.CommonName, "specUsername", csr.Spec.Username)
+
+			appendCondition(&csr, false, reason)
+		} else if valid, reason, err := r.DNSCheck(ctx, &csr, x509cr); !valid {
+			if err != nil {
+				l.V(0).Error(err, reason)
+				return res, err // returning a non-nil error to make this request be processed again in the reconcile function
+			}
+
+			l.V(0).Info("Denying kubelet-serving CSR. DNS checks failed. Reason:" + reason)
+
+			appendCondition(&csr, false, reason)
+		} else if valid, reason, err := r.WhitelistedIPCheck(&csr, x509cr); !valid {
+			if err != nil {
+				l.V(0).Error(err, reason)
+				return res, err // returning a non-nil error to make this request be processed again in the reconcile function
+			}
+
+			l.V(0).Info("Denying kubelet-serving CSR. IP whitelist check failed. Reason:" + reason)
+			appendCondition(&csr, false, reason)
+		} else if csr.Spec.ExpirationSeconds != nil && *csr.Spec.ExpirationSeconds > r.MaxExpirationSeconds {
+			reason := "CSR spec.expirationSeconds is longer than the maximum allowed expiration second"
+			l.V(0).Info("Denying kubelet-serving CSR. Reason:" + reason)
+
+			appendCondition(&csr, false, reason)
+		} else if valid, reason := ProviderChecks(&csr, x509cr); !valid {
+			l.V(0).Info("CSR request did not pass the provider-specific tests. Reason: " + reason)
+			appendCondition(&csr, false, reason)
+		} else {
+			l.V(0).Info("CSR approved")
+			appendCondition(&csr, true, "")
+		}
+	}
 	_, err = r.ClientSet.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, req.Name, &csr, metav1.UpdateOptions{})
 
 	if apierrors.IsConflict(err) || apierrors.IsNotFound(err) {
@@ -190,7 +196,7 @@ func appendCondition(csr *certificatesv1.CertificateSigningRequest, approved boo
 			Type:               certificatesv1.CertificateApproved,
 			Status:             corev1.ConditionTrue,
 			Reason:             "kubelet-serving cert validated",
-			Message:            "CSR complied with kubelet-csr-approver validation process",
+			Message:            "CSR complied with csr-approver validation process",
 			LastUpdateTime:     metav1.Now(),
 			LastTransitionTime: metav1.Time{},
 		})
@@ -199,7 +205,7 @@ func appendCondition(csr *certificatesv1.CertificateSigningRequest, approved boo
 			Type:               certificatesv1.CertificateDenied,
 			Status:             corev1.ConditionTrue,
 			Reason:             "kubelet-serving cert denied",
-			Message:            "CSR not complying with kubelet-csr-approver validation process. Reason: " + reason,
+			Message:            "CSR not complying with csr-approver validation process. Reason: " + reason,
 			LastUpdateTime:     metav1.Now(),
 			LastTransitionTime: metav1.Time{},
 		})
