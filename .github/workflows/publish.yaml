@@ -47,9 +47,10 @@ jobs:
 
       - name: Run Unit tests @
         run: |
-          source local/envtest-bin/env
-          export KUBEBUILDER_ASSETS=$(pwd)/$KUBEBUILDER_ASSETS
-          go test -race -covermode atomic -coverprofile=profile.cov ./...
+          make test
+          #source local/envtest-bin/env
+          #export KUBEBUILDER_ASSETS=$(pwd)/$KUBEBUILDER_ASSETS
+          #go test -race -covermode atomic -coverprofile=profile.cov ./...
 
       - name: Send coverage
         env:

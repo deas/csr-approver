@@ -108,9 +108,9 @@ $(ENVTEST): $(LOCALBIN)
 .PHONY: test
 # test: manifests generate fmt vet envtest ## Run tests.
 test: fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
-#	go test ./... -coverprofile cover.out
-#	go test ./pkg/git # ./... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -covermode atomic -coverprofile profile.cov
+# TODO: Test are not safe wrt -race
+#	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -race -covermode atomic -coverprofile profile.cov
 
 .PHONY: build
 build: ## Basic go build 

@@ -1,9 +1,16 @@
 name: release
 
 on:
+  workflow_dispatch:
   push:
-    tags:
-      - "*"
+    branches:
+      - "main"
+    paths:
+      - "Dockerfile"
+      - "entrypoint.sh"
+      - ".github/workflows/release.yml"
+    #tags:
+    #  - '*'
 
 permissions:
   contents: write # needed to write releases
@@ -15,16 +22,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: sigstore/cosign-installer@main
-      - uses: fluxcd/flux2/action@main
-      - name: Setup Helm
-        uses: ./.github/actions/helm
         with:
-          version: 3.8.1
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v2
-        with:
-          platforms: all
+          fetch-depth: 0
+      #- uses: sigstore/cosign-installer@main
+      #- uses: fluxcd/flux2/action@main
+      # - name: Setup Helm
+      #  uses: ./.github/actions/helm
+      #  with:
+      #    version: 3.8.1
+      #- name: Setup QEMU
+      #    uses: docker/setup-qemu-action@v2
+      #   with:
+      #     platforms: all
       - name: Setup Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v2
@@ -32,22 +41,20 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
-          username: ${{ secrets.DOCKER_USERNAME }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GHCR_TOKEN }}
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Prepare
         id: prep
         run: |
-          VERSION=sha-${GITHUB_SHA::8}
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF/refs\/tags\//}
-          fi
-          echo ::set-output name=BUILD_DATE::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-          echo ::set-output name=VERSION::${VERSION}
+          build_id=0.1.$(git rev-list --count HEAD)
+          echo "::set-output name=VERSION::${build_id}"
+        #run: |
+        #  VERSION=sha-${GITHUB_SHA::8}
+        #  if [[ $GITHUB_REF == refs/tags/* ]]; then
+        #    VERSION=${GITHUB_REF/refs\/tags\//}
+        #  fi
+        #  echo ::set-output name=BUILD_DATE::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+        #  echo ::set-output name=VERSION::${VERSION}
       - name: Generate images meta
         id: meta
         uses: docker/metadata-action@v4
@@ -64,67 +71,36 @@ jobs:
           push: true
           builder: ${{ steps.buildx.outputs.name }}
           context: .
-          file: ./Dockerfile.xx
-          platforms: linux/amd64,linux/arm/v7,linux/arm64
+          # file: ./Dockerfile.xx
+          # platforms: linux/amd64,linux/arm/v7,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-      - name: Publish Helm chart to GHCR
-        run: |
-          helm package charts/csr-approver
-          helm push csr-approver-${{ steps.prep.outputs.VERSION }}.tgz oci://ghcr.io/deas/charts
-          rm csr-approver-${{ steps.prep.outputs.VERSION }}.tgz
-      - name: Publish Flux OCI artifact to GHCR
-        run: |
-          flux push artifact oci://ghcr.io/deas/manifests/csr-approver:${{ steps.prep.outputs.VERSION }} \
-            --path="./kustomize" \
-            --source="${{ github.event.repository.html_url }}" \
-            --revision="${GITHUB_REF_NAME}/${GITHUB_SHA}"
-          flux tag artifact oci://ghcr.io/deas/manifests/csr-approver:${{ steps.prep.outputs.VERSION }} --tag latest
-      - name: Sign OCI artifacts
-        env:
-          COSIGN_EXPERIMENTAL: 1
-        run: |
-          cosign sign docker.io/deas/csr-approver:${{ steps.prep.outputs.VERSION }}
-          cosign sign ghcr.io/deas/csr-approver:${{ steps.prep.outputs.VERSION }}
-          cosign sign ghcr.io/deas/charts/csr-approver:${{ steps.prep.outputs.VERSION }}
-          cosign sign ghcr.io/deas/manifests/csr-approver:${{ steps.prep.outputs.VERSION }}
-      - name: Publish base image
-        uses: docker/build-push-action@v2
-        with:
-          push: true
-          builder: ${{ steps.buildx.outputs.name }}
-          context: .
-          platforms: linux/amd64
-          file: ./Dockerfile.base
-          tags: docker.io/deas/csr-approver-base:latest
-      - name: Publish helm chart
-        uses: deas/helm-gh-pages@master
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish config artifact
-        run: |
-          flux push artifact oci://ghcr.io/deas/csr-approver-deploy:${{ steps.prep.outputs.VERSION }} \
-            --path="./kustomize" \
-            --source="${{ github.event.repository.html_url }}" \
-            --revision="${GITHUB_REF_NAME}/${GITHUB_SHA}"
-          flux tag artifact oci://ghcr.io/deas/csr-approver-deploy:${{ steps.prep.outputs.VERSION }} --tag latest
-      - name: Sign config artifact
-        run: |
-          echo "$COSIGN_KEY" > /tmp/cosign.key
-          cosign sign -key /tmp/cosign.key ghcr.io/deas/csr-approver-deploy:${{ steps.prep.outputs.VERSION }}
-          cosign sign -key /tmp/cosign.key ghcr.io/deas/csr-approver-deploy:latest
-        env:
-          COSIGN_PASSWORD: ${{secrets.COSIGN_PASSWORD}}
-          COSIGN_KEY: ${{secrets.COSIGN_KEY}}
-      - uses: ./.github/actions/release-notes
-      - name: Generate release notes
-        run: |
-          echo 'CHANGELOG' > /tmp/release.txt
-          github-release-notes -org deas -repo csr-approver -since-latest-release >> /tmp/release.txt
-      - name: Publish release
-        uses: goreleaser/goreleaser-action@v3
-        with:
-          version: latest
-          args: release --release-notes=/tmp/release.txt --skip-validate
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #- name: Publish Helm chart to GHCR
+      #  run: |
+      #    helm package charts/csr-approver
+      #    helm push csr-approver-${{ steps.prep.outputs.VERSION }}.tgz oci://ghcr.io/deas/charts
+      #    rm csr-approver-${{ steps.prep.outputs.VERSION }}.tgz
+      #  env:
+      #- name: Sign OCI artifacts
+      #    COSIGN_EXPERIMENTAL: 1
+      #   run: |
+      #    cosign sign docker.io/deas/csr-approver:${{ steps.prep.outputs.VERSION }}
+      #    cosign sign ghcr.io/deas/csr-approver:${{ steps.prep.outputs.VERSION }}
+      #    cosign sign ghcr.io/deas/charts/csr-approver:${{ steps.prep.outputs.VERSION }}
+      #    cosign sign ghcr.io/deas/manifests/csr-approver:${{ steps.prep.outputs.VERSION }}
+      #- name: Publish helm chart
+      #  uses: deas/helm-gh-pages@master
+      #  with:
+      #    token: ${{ secrets.GITHUB_TOKEN }}
+      #- uses: ./.github/actions/release-notes
+      #- name: Generate release notes
+      #  run: |
+      #    echo 'CHANGELOG' > /tmp/release.txt
+      #     github-release-notes -org deas -repo csr-approver -since-latest-release >> /tmp/release.txt
+      # - name: Publish release
+      #   uses: goreleaser/goreleaser-action@v3
+      #   with:
+      #     version: latest
+      #     args: release --release-notes=/tmp/release.txt --skip-validate
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
