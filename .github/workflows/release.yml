@@ -60,8 +60,8 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: |
-            docker.io/deas/csr-approver
             ghcr.io/deas/csr-approver
+          # docker.io/deas/csr-approver
           tags: |
             type=raw,value=${{ steps.prep.outputs.VERSION }}
             type=raw,value=latest
