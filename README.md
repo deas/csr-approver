@@ -165,3 +165,7 @@ make
 ```
 
 Should give you a bunch of tasks/targets to start with.
+
+## TODO
+* Work through all those `TODO` tags in the code
+* Improve Github Workflows (e.g. handle/release helm chart)
